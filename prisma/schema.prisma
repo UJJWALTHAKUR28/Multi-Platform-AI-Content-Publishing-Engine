@@ -1,8 +1,338 @@
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum Platform {
+  Twitter
+  Linkedin
+  Instagram
+  Threads
+}
+enum PostType {
+  Announcement
+  Thread
+  Story
+  Promotional
+  Educational
+  Opinion
+}
+enum PostStats {
+  Pending
+  Processing
+  Partial
+  Published
+  Failed
+  Cancelled
+}
+enum JobStatus {
+  Queued
+  InProgress
+  Published
+  Failed
+  Cancelled
+}
+enum NotificationType {
+  POST_PUBLISHED
+  POST_PARTIAL
+  POST_FAILED
+  TOKEN_EXPIRING
+  TOKEN_EXPIRED
+  SCHEDULE_REMINDER
+  SYSTEM_ALERT
+}
+enum AIModel {
+  OPENAI
+  ANTHROPIC
+  GEMINI
+}
+enum Bot {
+  Telegram
+  Whatsapp
+}
+enum WebhookStats {
+  PROCESSING
+  COMPLETED
+  SKIPPED
+  FAILED
+}
+enum AuditAction {
+  USER_REGISTERED
+  USER_LOGIN
+  USER_LOGOUT
+  TOKEN_REFRESHED
+  TOKEN_REVOKED
+  PASSWORD_CHANGED
+  EMAIL_VERIFIED
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  SOCIAL_ACCOUNT_CONNECTED
+  SOCIAL_ACCOUNT_DISCONNECTED
+  AI_KEY_UPDATED
+  PROFILE_UPDATED
+  POST_CREATED
+  POST_CANCELLED
+  POST_DELETED
+  POST_RETRIED
+  SUSPICIOUS_LOGIN
+  ACCOUNT_SUSPENDED
+}
+model User{
+  id String @id @default(uuid())
+  email String @unique
+  username String
+  password String @map("password_hash")
+  timezone String @default("UTC")
+  telegramChatId String? @map("telegram_chat_id")
+  whatsappNo String? @map("whatsapp_number")
+  isActive Boolean @default(true) @map("is_active")
+  emailverified Boolean @default(false) @map("email_verified")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  refreshtokens RefreshToken[]
+  emailverfitokens EmailVerificationToken[]
+  passwordrestokens PasswordResetToken[]
+  socialAccounts SocialAccount[]
+  aiKeys AIKey[]
+  posts Post[]
+  postTemplates PostTemplate[]
+  webhooksEvents WebhookEvent[]
+  apiUse APILog[]
+  notifications UserNotification[]
+  logs AuditLog[]
+  @@index([email]) 
+  @@index([telegramChatId]) 
+  @@index([whatsappNo])
+  @@index([isActive])
+  @@map("users")
+  }
+model EmailVerificationToken{
+  id String @id @default(uuid())
+  userId String @map("user_id")
+  token String @unique @map("token")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([token])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken{
+  id String @id @default(uuid())
+  userId String @map("user_id")
+  token String @unique @map("token")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([token])
+  @@map("password_reset_tokens")
+}
+model RefreshToken{
+  id String @id @default(uuid())
+  userId String @map("user_id")
+  token String @unique @map("hashedtoken")
+  expiresAt DateTime @map("expiresat")
+  revoked Boolean @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  userAgent String @map("user_agent")
+  ipAddress String @map("ip_address")
+  lastUsedAt DateTime? @map("lastused_at")
+  deviceName String? @map("device_name")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([token])
+  @@index([userId, revoked])
+  @@map("refresh_tokens")
+}
+
+
+model AIKey{
+  id String @id @default(uuid())
+  userId String @unique @map("user_id")
+  openaiKey String? @map("enc_openaikey")
+  anthropicKey String? @map("enc_anthropickey")
+  geminiKey String? @map("enc_geminikey")
+  defaultAIModel AIModel @default(OPENAI) @map("default_ai_model")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("ai_keys")
+}
+
+model SocialAccount{
+ id String @id @default(uuid())
+ userId String @map("user_id")
+ platform Platform
+ platformUserId String @map("platform_userid")
+ accessToken String @map("access_token")
+ refreshToken String? @map("refresh_token")
+ tokenExpiresAt DateTime? @map("token_expires_at")
+ scope String?
+ handle String?
+ connectedAt DateTime @default(now()) @map("connected_at")
+ updatedAt DateTime @updatedAt @map("updated_at")
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ platformPosts PlatformPost[] @relation("SocialAccPosts")
+ @@unique([userId,platform])
+ @@index([userId])
+ @@index([platform,tokenExpiresAt])
+ @@map("social_accounts")
+ 
+}
+model Post{
+  id String @id @default(uuid())
+  userId String @map("user_id")
+  idea String
+  title String?
+  postType PostType @map("post_type")
+  tone String?
+  modelused String? @map("model_used")
+  aiModel AIModel? @map("ai_model")
+  tokensUsed Int? @map("tokens_used")
+  stats PostStats @default(Pending)
+  publishAt DateTime? @map("publish_at")
+  bot Bot? @map("bot")
+  templateId String? @map("template_id")
+  metadata Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedat DateTime? @map("deleted_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template PostTemplate? @relation("template", fields: [templateId], references: [id], onDelete: SetNull)
+  platformPosts PlatformPost[]
+  apiLogs APILog[]
+  @@index([userId])
+  @@index([stats])
+  @@index([publishAt])
+  @@index([publishAt,stats])
+  @@index([templateId])
+  @@index([userId,stats])
+  @@index([userId,deletedat])
+  @@index([bot])
+  @@index([aiModel])
+  @@map("posts")
+}
+model PostTemplate{
+  id String @id @default(uuid())
+  userId String @map("user_id")
+  name String
+  postType PostType @map("post_type")
+  tone String
+  platform Platform[]
+  peferModel AIModel @default(OPENAI) @map("prefer_model")
+  isDefault Boolean @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts Post[] @relation("template")
+  @@index([userId])
+  @@map("post_templates")
+}
+model PlatformPost{
+ id String @id @default(uuid())
+ postId String @map("post_id")
+ socialAccountId String? @map("social_account_id")
+ platform Platform
+ content String
+ hashtages String[]
+ mediaUrls String[] @default([]) @map("media_urls")
+ status JobStatus @default(Queued)
+ attemps Int @default(0)
+ platformPostId String? @map("platform_post_id")
+ publishAt DateTime? @map("publish_at")
+ errorMessage String? @map("error_message")
+ platformError Json? @map("platform_error")
+ retryAfter DateTime? @map("retry_after")
+ bulljobId String? @map("bulljob_id")
+ createdAt DateTime @default(now()) @map("created_at")
+ updatedAt DateTime @updatedAt @map("updated_at")
+ post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+ socialAccount SocialAccount? @relation("SocialAccPosts", fields: [socialAccountId], references: [id], onDelete: SetNull)
+
+@@unique([postId,platform])
+@@index([postId])
+@@index([status])
+@@index([publishAt])
+@@index([platform, status])
+@@index([socialAccountId, status])
+@@index([retryAfter])
+@@map("platform_posts")
+}
+model APILog{
+ id          String     @id @default(uuid())
+  userId      String?    @map("user_id")   
+  postId      String?    @map("post_id")
+  provider    AIModel    @map("provider")  
+  model       String     
+  tokensIn    Int        @map("tokens_in")
+  tokensOut   Int        @map("tokens_out")
+  costUsd     Decimal?   @map("cost_usd")  @db.Decimal(10, 6)
+  usedOwnKey  Boolean    @default(false) @map("used_own_key")
+  latencyMs   Int?       @map("latency_ms")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  user        User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  post        Post?      @relation(fields: [postId], references: [id], onDelete: SetNull)
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([postId])
+  @@index([provider, createdAt])
+  @@map("api_usage_logs")
+}
+model UserNotification{
+ id              String           @id @default(uuid())
+  userId          String           @map("user_id")
+  type            NotificationType @map("type")
+  title           String
+  body            String
+  actionUrl       String?          @map("action_url") 
+  sentViaTelegram Boolean          @default(false) @map("sent_via_telegram")
+  readAt          DateTime?        @map("read_at")
+  metadata        Json?           
+  createdAt       DateTime         @default(now()) @map("created_at")
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("user_notifications")
+}
+model AuditLog{
+  id         String      @id @default(uuid())
+  userId     String?     @map("user_id")
+  action     AuditAction
+  resource   String? 
+  resourceId String?     @map("resource_id")
+  ipAddress  String?     @map("ip_address")
+  userAgent  String?     @map("user_agent")
+  metadata   Json?
+  createdAt  DateTime    @default(now()) @map("created_at")
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([userId])
+  @@index([userId, action])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+model WebhookEvent {
+  id           String        @id @default(uuid())
+  userId       String?       @map("user_id")
+  source       String                        
+  externalId   String        @map("external_id") 
+  stats        WebhookStats  @default(PROCESSING)
+  payload      Json                          
+  errorMessage String?       @map("error_message")
+  retryCount   Int           @default(0) @map("retry_count")
+  processedAt  DateTime      @default(now()) @map("processed_at")
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@unique([source, externalId])
+  @@index([processedAt])
+  @@index([stats])
+  @@map("webhook_events")
 }
