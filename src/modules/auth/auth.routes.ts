@@ -1,0 +1,22 @@
+import { Router } from "express";
+import controller from "./auth.controller";
+import { validate } from "../../middleware/validate";
+import { authenticate } from "../../middleware/authenticate";
+import { authenticateNoVerify } from "../../middleware/require-verified-email";
+import { rateLimiter } from "../../middleware/rate-limiter";
+import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, verifyEmailSchema, changePasswordSchema, } from "./auth.schema";
+const authRoutes = Router();
+authRoutes.post("/register", rateLimiter("register"), validate(registerSchema), controller.register,);
+authRoutes.post("/login", rateLimiter("login"), validate(loginSchema), controller.login,);
+authRoutes.post("/refresh", rateLimiter("refresh"), controller.refresh,);
+authRoutes.post("/forgot-password", rateLimiter("forgotPassword"), validate(forgotPasswordSchema), controller.forgotPassword,);
+authRoutes.post("/reset-password", validate(resetPasswordSchema), controller.resetPassword,);
+authRoutes.get("/verify-email", rateLimiter("verifyEmail"), controller.verifyEmail,);
+authRoutes.post("/verify-email", rateLimiter("verifyEmail"), validate(verifyEmailSchema), controller.verifyEmail,);
+authRoutes.post("/logout", authenticateNoVerify, controller.logout,);
+authRoutes.post("/logout-all", authenticateNoVerify, controller.logoutAll,);
+authRoutes.post("/resend-verification", authenticateNoVerify, rateLimiter("resendVerification"), controller.resendVerification,);
+authRoutes.post("/change-password", authenticate, validate(changePasswordSchema), controller.changePassword,);
+authRoutes.get("/me", authenticate, controller.getProfile,);
+
+export default authRoutes;
