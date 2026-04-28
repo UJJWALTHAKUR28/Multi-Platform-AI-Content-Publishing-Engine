@@ -140,6 +140,7 @@ model RefreshToken{
   token String @unique @map("hashedtoken")
   expiresAt DateTime @map("expiresat")
   revoked Boolean @default(false)
+  revokedAt DateTime? @map("revoked_at")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   userAgent String @map("user_agent")
