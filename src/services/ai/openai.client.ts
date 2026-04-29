@@ -8,9 +8,9 @@ export interface CallParameters {
 
 export interface AIResponse {
     raw: string;
-    tokenIn: number;
-    tokenOut: number;
-    tokensused: number;
+    tokensIn: number;
+    tokensOut: number;
+    tokensUsed: number;
     model: string;
 }
 
@@ -42,9 +42,9 @@ export const callOpenAIApi = async (params: CallParameters): Promise<AIResponse>
     const raw = response.choices[0].message.content||"";
     return {
         raw,
-        tokenIn: response.usage?.prompt_tokens||0,
-        tokenOut: response.usage?.completion_tokens||0,
-        tokensused: response.usage?.total_tokens||0,
+        tokensIn: response.usage?.prompt_tokens||0,
+        tokensOut: response.usage?.completion_tokens||0,
+        tokensUsed: response.usage?.total_tokens||0,
         model: response.model
     };
 }    

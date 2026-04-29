@@ -8,9 +8,9 @@ export interface CallParameters {
 
 export interface AIResponse {
     raw: string;
-    tokenIn: number;
-    tokenOut: number;
-    tokensused: number;
+    tokensIn: number;
+    tokensOut: number;
+    tokensUsed: number;
     model: string;
 }
 
@@ -32,9 +32,9 @@ export const callAnthropicApi = async (params: CallParameters): Promise<AIRespon
     const raw = response.content.filter(block => block.type === 'text').map(block => (block as any).text).join('');
     return {
         raw,
-        tokenIn: response.usage.input_tokens,
-        tokenOut: response.usage.output_tokens,
-        tokensused: response.usage.input_tokens + response.usage.output_tokens,
+        tokensIn: response.usage.input_tokens,
+        tokensOut: response.usage.output_tokens,
+        tokensUsed: response.usage.input_tokens + response.usage.output_tokens,
         model: response.model
     }
 }

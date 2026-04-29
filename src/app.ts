@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./modules/auth/auth.routes";
 import { errorHandler } from "./middleware/error-handler";
 import user from './modules/user/user.routes';
+import content from './modules/content/content.routes';
 const app=express()
 app.use(express.json())
 app.use(helmet())
@@ -22,5 +23,6 @@ app.get('/health',(req,res)=>{
 })
 app.use("/api/auth", authRoutes);
 app.use("/api/user",user)
+app.use("/api/content",content)
 app.use(errorHandler);
 export default app
