@@ -14,6 +14,16 @@ const envSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
   PORT: z.coerce.number().int().min(1).default(3000),
+  ENCRYPTION_KEY: z.string().length(64, "ENCRYPTION_KEY must be a 64-character hex string (32 bytes)"),
+  TWITTER_CLIENT_ID: z.string().default(""),
+  TWITTER_CLIENT_SECRET: z.string().default(""),
+  LINKEDIN_CLIENT_ID: z.string().default(""),
+  LINKEDIN_CLIENT_SECRET: z.string().default(""),
+  INSTAGRAM_CLIENT_ID: z.string().default(""),
+  INSTAGRAM_CLIENT_SECRET: z.string().default(""),
+  THREADS_CLIENT_ID: z.string().default(""),
+  THREADS_CLIENT_SECRET: z.string().default(""),
+  OAUTH_CALLBACK_BASE_URL: z.string().default(""),
 });
 export type Env = z.infer<typeof envSchema>;
 function validateEnv(): Env {
