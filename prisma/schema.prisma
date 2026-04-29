@@ -84,6 +84,9 @@ model User{
   id String @id @default(uuid())
   email String @unique
   username String
+  bio String?
+  defaultTone String?
+  defaultLanguage String? @default("en")
   password String @map("password_hash")
   timezone String @default("UTC")
   telegramChatId String? @map("telegram_chat_id")
@@ -179,6 +182,7 @@ model SocialAccount{
  tokenExpiresAt DateTime? @map("token_expires_at")
  scope String?
  handle String?
+ linkMethod String @default("manual") @map("link_method")
  connectedAt DateTime @default(now()) @map("connected_at")
  updatedAt DateTime @updatedAt @map("updated_at")
  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
