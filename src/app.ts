@@ -5,6 +5,7 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import authRoutes from "./modules/auth/auth.routes";
 import { errorHandler } from "./middleware/error-handler";
+import user from './modules/user/user.routes';
 const app=express()
 app.use(express.json())
 app.use(helmet())
@@ -20,5 +21,6 @@ app.get('/health',(req,res)=>{
     res.send('OK')
 })
 app.use("/api/auth", authRoutes);
+app.use("/api/user",user)
 app.use(errorHandler);
 export default app
