@@ -1,12 +1,17 @@
 import { Worker, Job } from 'bullmq';
 import { redis } from '../../config/redis';
-import { PublishJobData } from '../publish.queue';
+import { PublishJobData, BACKOFF_DELAYS } from '../publish.queue';
 import { processPublishJob, handleJobFailure } from '../processors/publish.proccesor';
 export const startPublishWorker = (): Worker => {
     const worker = new Worker<PublishJobData>('publish',async (job: Job<PublishJobData>) => {await processPublishJob(job);},
         {
             connection: redis,
             concurrency: 5,
+            settings: {
+                backoffStrategy: (attemptsMade: number) => {
+                    return BACKOFF_DELAYS[attemptsMade - 1] ?? BACKOFF_DELAYS[BACKOFF_DELAYS.length - 1];
+                },
+            },
         });
     worker.on('active', (job: Job<PublishJobData>) => {
         console.log(

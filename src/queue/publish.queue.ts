@@ -1,29 +1,28 @@
 import { Queue } from 'bullmq';
 import { redis } from '../config/redis';
 export interface PublishJobData {
-  platformPostId: string;   
-  postId:         string;   
-  userId:         string;   
-  platform:  string;
-  content:   string;        
-  hashtags:  string[];      
+  platformPostId: string;
+  postId: string;
+  userId: string;
+  platform: string;
+  content: string;
+  hashtags: string[];
   publishAt: string | null;
-  retryCount: number;
-}
+  retryCount: number;}
+export const BACKOFF_DELAYS = [1000, 5000, 25000];
 export const publishQueue = new Queue<PublishJobData>('publish', {
   connection: redis,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
-      type:  'exponential',
-      delay: 1000,
+      type: 'custom',
     },
     removeOnComplete: { count: 100 },
-    removeOnFail:     { count: 500 },
+    removeOnFail: { count: 500 },
   },
 });
-export const enqueuePublishJob = async (data:    PublishJobData, delayMs: number = 0):Promise<string> => {
-  const job = await publishQueue.add(`${data.platform.toLowerCase()}:${data.postId}`,data,
+export const enqueuePublishJob = async (data:PublishJobData, delayMs: number = 0):Promise<string> => {
+  const job = await publishQueue.add(`${data.platform.toLowerCase()}:${data.postId}`, data,
     {
       delay: delayMs,
       jobId: data.platformPostId,
@@ -33,7 +32,7 @@ export const enqueuePublishJob = async (data:    PublishJobData, delayMs: number
 };
 export const cancelJob = async (bullJobId: string): Promise<boolean> => {
   try {
-    const job   = await publishQueue.getJob(bullJobId);
+    const job = await publishQueue.getJob(bullJobId);
     if (!job) return false;
     const state = await job.getState();
     if (state === 'delayed' || state === 'waiting') {

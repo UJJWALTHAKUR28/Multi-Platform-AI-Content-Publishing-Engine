@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { sendSuccess } from '../../utils/api-response';
+import { sendSuccess, sendPaginated } from '../../utils/api-response';
 import { ApiError } from '../../utils/api-error';
 import * as dashboardService from './dashboard.service';
 
@@ -27,8 +27,7 @@ async function history(req: Request, res: Response, next: NextFunction): Promise
       date_from: req.query.date_from as string | undefined,
       date_to: req.query.date_to as string | undefined,
     });
-
-    res.status(200).json({ success: true, ...result });
+    sendPaginated(res, result.data, result.meta);
   } catch (err) {
     next(err);
   }

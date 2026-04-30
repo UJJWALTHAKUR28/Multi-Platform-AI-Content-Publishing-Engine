@@ -67,7 +67,7 @@ export async function getPostHistory(userId: string, query: { page: number; limi
     });
     const ids = pps.map((p) => p.postId);
     if (ids.length === 0) {
-      return { data: [], meta: { total: 0, page, limit, totalPages: 0, error: null } };
+      return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
     }
     where.id = { in: ids };
   }
@@ -80,5 +80,5 @@ export async function getPostHistory(userId: string, query: { page: number; limi
       orderBy: { createdAt: 'desc' },
       include: { platformPosts: { select: { id: true, platform: true, content: true, hashtages: true, status: true, attemps: true, publishAt: true, errorMessage: true, bulljobId: true, updatedAt: true, }, }, },
     }),]);
-  return { data: posts, meta: { total, page, limit, totalPages: Math.ceil(total / limit), error: null, }, };
+  return { data: posts, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
 }

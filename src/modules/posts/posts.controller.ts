@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { sendSuccess } from '../../utils/api-response';
+import { sendSuccess, sendPaginated } from '../../utils/api-response';
 import { extractRequestMeta } from '../../utils/request-meta.util';
 import { ApiError } from '../../utils/api-error';
 import * as postService from '././posts.service';
@@ -31,7 +31,7 @@ async function listPosts(req: Request, res: Response, next: NextFunction): Promi
   try {
     if (!req.user) throw ApiError.unauthorized('Authentication required');
     const result = await postService.listPosts(req.user.id, req.query as unknown as ListPostsQuery);
-    res.status(200).json({ success: true, ...result });
+    sendPaginated(res, result.data, result.meta);
   } catch (err) {
     next(err);
   }
