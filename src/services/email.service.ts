@@ -12,7 +12,7 @@ async function send(to: string, subject: string, html: string): Promise<void> {
     return;
   }
   const { error } = await resend.emails.send({
-    from: env.FROM_EMAIL,
+    from: `Postly <${env.FROM_EMAIL}>`,
     to,
     subject,
     html,
