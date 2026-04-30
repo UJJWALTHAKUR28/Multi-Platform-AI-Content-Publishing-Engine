@@ -56,7 +56,7 @@ export const threadsPublisher = async (
         );
     }
     const accessToken = decrypt(account.accessToken);
-    const userId      = account.platformUserId;
+    const userId      = decrypt(account.platformUserId);
     const hashtagStr = input.hashtags
         .slice(0, 3)
         .map(h => h.startsWith('#') ? h : `#${h}`)

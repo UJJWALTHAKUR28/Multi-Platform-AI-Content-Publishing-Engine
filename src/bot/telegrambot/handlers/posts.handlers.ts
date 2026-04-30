@@ -165,11 +165,12 @@ export const handlePostFlow = async (bot: TelegramBot, msg: TelegramBot.Message,
       break;
     }
     case 'PLATFORMS': {
+      const cleanText = text.replace(/^✅\s*/, '').trim();
       let picked: string[] = session.platforms ?? [];
 
-      if (text === 'All') {
+      if (cleanText === 'All') {
         picked = [...ALL_PLATFORMS];
-      } else if (text === 'Done') {
+      } else if (cleanText === 'Done') {
         if (picked.length === 0) {
           await safeSend(bot, chatId, '⚠️ Please select at least one platform before clicking Done.');
           return;
@@ -187,7 +188,7 @@ export const handlePostFlow = async (bot: TelegramBot, msg: TelegramBot.Message,
         return;
       } else {
         // Toggle logic
-        const enumVal = PLATFORM_LABELS[text] || Object.values(PLATFORM_LABELS).find(v => v === text);
+        const enumVal = PLATFORM_LABELS[cleanText] || Object.values(PLATFORM_LABELS).find(v => v === cleanText);
         if (enumVal) {
           if (picked.includes(enumVal)) {
             picked = picked.filter(p => p !== enumVal);

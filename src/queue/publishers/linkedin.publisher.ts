@@ -1,28 +1,23 @@
 import { prisma } from '../../db/prisma';
 import { decrypt } from '../../utils/encryption.util';
 import { ApiError } from '../../utils/api-error';
-
 interface PublisherInput {
     userId: string;
     content: string;
     hashtags: string[];
     platform: string;
 }
-
 interface PublisherResult {
     platformPostId: string | null;
 }
-
 interface LinkedInErrorResponse {
     message?: string;
     status?: number;
     code?: number;
 }
-
 interface LinkedInSuccessResponse {
     id?: string;
 }
-
 type LinkedInResponse = LinkedInErrorResponse & LinkedInSuccessResponse;
 export const linkedinPublisher = async (input: PublisherInput): Promise<PublisherResult> => {
     const account = await prisma.socialAccount.findUnique({
@@ -53,8 +48,11 @@ export const linkedinPublisher = async (input: PublisherInput): Promise<Publishe
             `LinkedIn token expired for ${account.handle}. Reconnect your account.`
         );
     }
-    const accessToken = decrypt(account.accessToken);
-    const hashtagStr = input.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ');
+    const accessToken    = decrypt(account.accessToken);
+    const platformUserId = decrypt(account.platformUserId);
+    const hashtagStr = input.hashtags
+        .map(h => h.startsWith('#') ? h : `#${h}`)
+        .join(' ');
     const postText = `${input.content}\n\n${hashtagStr}`.trim();
     const response = await fetch('https://api.linkedin.com/v2/ugcPosts', {
         method: 'POST',
@@ -64,7 +62,7 @@ export const linkedinPublisher = async (input: PublisherInput): Promise<Publishe
             'X-Restli-Protocol-Version': '2.0.0',
         },
         body: JSON.stringify({
-            author: `urn:li:person:${account.platformUserId}`,
+            author: platformUserId.startsWith('urn:li:') ? platformUserId : `urn:li:person:${platformUserId}`,
             lifecycleState: 'PUBLISHED',
             specificContent: {
                 'com.linkedin.ugc.ShareContent': {
