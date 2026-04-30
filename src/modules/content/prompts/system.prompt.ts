@@ -32,10 +32,10 @@ No markdown code blocks. No explanation text. No preamble. Just raw JSON.
 
 The JSON schema must be exactly:
 {
-  "twitter":   { "content": "string", "hashtags": ["string"] } or null,
-  "linkedin":  { "content": "string", "hashtags": ["string"] } or null,
-  "instagram": { "content": "string", "hashtags": ["string"] } or null,
-  "threads":   { "content": "string", "hashtags": ["string"] } or null
+  "Twitter":   { "content": "string", "hashtags": ["string"] } or null,
+  "Linkedin":  { "content": "string", "hashtags": ["string"] } or null,
+  "Instagram": { "content": "string", "hashtags": ["string"] } or null,
+  "Threads":   { "content": "string", "hashtags": ["string"] } or null
 }
 
 Rules:

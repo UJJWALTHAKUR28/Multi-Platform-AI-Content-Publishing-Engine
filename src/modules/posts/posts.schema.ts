@@ -11,7 +11,7 @@ const platformContentItem = z.object({
   charCount: z.number().int().optional(),
   hashtags: z.array(z.string()).default([]),
 });
-const PLATFORM_KEYS = ['twitter', 'linkedin', 'instagram', 'threads'] as const;
+const PLATFORM_KEYS = ['Twitter', 'Linkedin', 'Instagram', 'Threads'] as const;
 export const publishPostSchema = z.object({
   idea: z.string().min(10, 'Idea must be at least 10 characters').max(500, 'Idea cannot exceed 500 characters'),
   postType: z.enum(POST_TYPES, { message: `Post type must be one of: ${POST_TYPES.join(', ')}` }),

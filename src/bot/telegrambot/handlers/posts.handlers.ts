@@ -1,9 +1,9 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { prisma } from '../../../db/prisma';
-import {getSession,saveSession,clearSession,} from '../session.service';
+import { getSession, saveSession, clearSession, } from '../session.service';
 import { generateContent } from '../../../services/ai/ai.service';
-import { enqueuePublishJob }from '../../../queue/publish.queue';
-import {  initiateTelegramLink,verifyTelegramOtp,} from '../telegram-link.service';
+import { enqueuePublishJob } from '../../../queue/publish.queue';
+import { initiateTelegramLink, verifyTelegramOtp, } from '../telegram-link.service';
 const POST_TYPES = [
   'Announcement',
   'Thread',
@@ -14,23 +14,23 @@ const POST_TYPES = [
 ] as const;
 const PLATFORM_LABELS: Record<string, string> = {
   'Twitter/X': 'Twitter',
-  'LinkedIn':  'Linkedin',
+  'LinkedIn': 'Linkedin',
   'Instagram': 'Instagram',
-  'Threads':   'Threads',
+  'Threads': 'Threads',
 };
 const PLATFORM_DISPLAY = Object.keys(PLATFORM_LABELS);
-const ALL_PLATFORMS    = Object.values(PLATFORM_LABELS); 
-const TONES  = ['Professional', 'Casual', 'Witty', 'Authoritative', 'Friendly'] as const;
+const ALL_PLATFORMS = Object.values(PLATFORM_LABELS);
+const TONES = ['Professional', 'Casual', 'Witty', 'Authoritative', 'Friendly'] as const;
 const MODELS = [
   'GPT-4o (OpenAI)',
   'Claude Sonnet (Anthropic)',
   'Gemini (Google)',
 ] as const;
 const PLATFORM_EMOJI: Record<string, string> = {
-  Twitter:   '🐦',
-  Linkedin:  '💼',
+  Twitter: '🐦',
+  Linkedin: '💼',
   Instagram: '📸',
-  Threads:   '🧵',
+  Threads: '🧵',
 };
 const makeKeyboard = (
   options: string[],
@@ -43,13 +43,13 @@ const makeKeyboard = (
       return rows;
     }, [] as TelegramBot.KeyboardButton[][]),
     one_time_keyboard: true,
-    resize_keyboard:   true,
+    resize_keyboard: true,
   },
 });
 const removeKeyboard = (): TelegramBot.SendMessageOptions => ({
   reply_markup: { remove_keyboard: true },
 });
-const safeSend = async (bot:TelegramBot,chatId:number,text:string,options: TelegramBot.SendMessageOptions = {},): Promise<void> => {
+const safeSend = async (bot: TelegramBot, chatId: number, text: string, options: TelegramBot.SendMessageOptions = {},): Promise<void> => {
   try {
     await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', ...options });
   } catch (err: any) {
@@ -57,9 +57,9 @@ const safeSend = async (bot:TelegramBot,chatId:number,text:string,options: Teleg
   }
 };
 
-export const handlePostFlow = async (bot:TelegramBot,msg:TelegramBot.Message,): Promise<void> => {
+export const handlePostFlow = async (bot: TelegramBot, msg: TelegramBot.Message,): Promise<void> => {
   const chatId = msg.chat.id;
-  const text   = msg.text?.trim() ?? '';
+  const text = msg.text?.trim() ?? '';
   if (!text) {
     await safeSend(bot, chatId, '📝 Please send a text message.');
     return;
@@ -68,13 +68,13 @@ export const handlePostFlow = async (bot:TelegramBot,msg:TelegramBot.Message,): 
   switch (session.step) {
     case 'IDLE': {
       const user = await prisma.user.findFirst({
-        where:  { telegramChatId: String(chatId) },
+        where: { telegramChatId: String(chatId) },
         select: { id: true, username: true },
       });
       if (user) {
         await saveSession(chatId, {
-          step:     'POST_TYPE',
-          userId:   user.id,
+          step: 'POST_TYPE',
+          userId: user.id,
           userName: user.username,
         });
         await safeSend(
@@ -165,36 +165,93 @@ export const handlePostFlow = async (bot:TelegramBot,msg:TelegramBot.Message,): 
       break;
     }
     case 'PLATFORMS': {
-      let picked: string[] = [];
+      let picked: string[] = session.platforms ?? [];
+
       if (text === 'All') {
         picked = [...ALL_PLATFORMS];
-      } else {
-        const raw = text.split(',').map((p: string) => p.trim());
-        for (const label of raw) {
-          const enumVal = PLATFORM_LABELS[label];
-          if (enumVal) picked.push(enumVal);
-        }
-
+      } else if (text === 'Done') {
         if (picked.length === 0) {
-          await safeSend(
-            bot, chatId,
-            `⚠️ I didn't recognize any platform\\.\n\n` +
-            `Please pick from the options or type them comma\\-separated:\n` +
-            `\`Twitter/X, LinkedIn, Instagram, Threads\``,
-            makeKeyboard([...PLATFORM_DISPLAY, 'All'], 2),
-          );
+          await safeSend(bot, chatId, '⚠️ Please select at least one platform before clicking Done.');
           return;
-        }}
-      await saveSession(chatId, { ...session, step: 'TONE', platforms: picked });
-      const platformList = picked
-        .map((p: string) => Object.keys(PLATFORM_LABELS).find((k) => PLATFORM_LABELS[k] === p) ?? p)
-        .join(', ');
+        }
+        // Move to TONE step
+        await saveSession(chatId, { ...session, step: 'TONE', platforms: picked });
+        const platformList = picked
+          .map((p: string) => Object.keys(PLATFORM_LABELS).find((k) => PLATFORM_LABELS[k] === p) ?? p)
+          .join(', ');
+        await safeSend(
+          bot, chatId,
+          `Got it — posting to: *${platformList}*\n\nWhat tone should the content have?`,
+          makeKeyboard([...TONES], 2),
+        );
+        return;
+      } else {
+        // Toggle logic
+        const enumVal = PLATFORM_LABELS[text] || Object.values(PLATFORM_LABELS).find(v => v === text);
+        if (enumVal) {
+          if (picked.includes(enumVal)) {
+            picked = picked.filter(p => p !== enumVal);
+          } else {
+            picked.push(enumVal);
+          }
+        } else {
+          // Check if it was a comma separated list typed manually
+          const raw = text.split(',').map((p: string) => p.trim());
+          let foundAny = false;
+          for (const label of raw) {
+            const val = PLATFORM_LABELS[label];
+            if (val && !picked.includes(val)) {
+              picked.push(val);
+              foundAny = true;
+            }
+          }
+
+          if (!foundAny && picked.length === 0) {
+            await safeSend(
+              bot, chatId,
+              `⚠️ I didn't recognize that platform\\.\n\n` +
+              `Please tap the buttons to select platforms:`,
+              makeKeyboard([...PLATFORM_DISPLAY, 'All'], 2),
+            );
+            return;
+          }
+
+          // If they typed a list, we can just proceed or stay
+          if (foundAny && text.includes(',')) {
+            // proceed to next step if they typed multiple
+            await saveSession(chatId, { ...session, step: 'TONE', platforms: picked });
+            const platformList = picked
+              .map((p: string) => Object.keys(PLATFORM_LABELS).find((k) => PLATFORM_LABELS[k] === p) ?? p)
+              .join(', ');
+            await safeSend(
+              bot, chatId,
+              `Got it — posting to: *${platformList}*\n\nWhat tone should the content have?`,
+              makeKeyboard([...TONES], 2),
+            );
+            return;
+          }
+        }
+      }
+
+      // If we are here, we are staying in the PLATFORMS step to allow more selection
+      await saveSession(chatId, { ...session, platforms: picked });
+
+      const currentSelection = picked.length > 0
+        ? picked.map(p => PLATFORM_EMOJI[p] + ' ' + (Object.keys(PLATFORM_LABELS).find(k => PLATFORM_LABELS[k] === p) || p)).join(', ')
+        : 'None';
+
+      const keyboardOptions = PLATFORM_DISPLAY.map(p => {
+        const isSelected = picked.includes(PLATFORM_LABELS[p]);
+        return isSelected ? `✅ ${p}` : p;
+      });
+
       await safeSend(
         bot, chatId,
-        `Got it — posting to: *${platformList}*\n\nWhat tone should the content have?`,
-        makeKeyboard([...TONES], 2),
+        `Current selection: *${currentSelection}*\n\nTap more platforms to add/remove, or tap *Done* to continue\\.`,
+        makeKeyboard([...keyboardOptions, 'All', '✅ Done'], 2),
       );
-      break;}
+      break;
+    }
     case 'TONE': {
       if (!(TONES as readonly string[]).includes(text)) {
         await safeSend(
@@ -202,19 +259,21 @@ export const handlePostFlow = async (bot:TelegramBot,msg:TelegramBot.Message,): 
           `⚠️ Please pick a tone from the options\\.`,
           makeKeyboard([...TONES], 2),
         );
-        return;}
+        return;
+      }
       await saveSession(chatId, { ...session, step: 'MODEL', tone: text });
       await safeSend(
         bot, chatId,
         `*${text}* tone it is\\.\n\nWhich AI model should generate the content?`,
         makeKeyboard([...MODELS], 1),
       );
-      break;}
+      break;
+    }
     case 'MODEL': {
       let model: 'OPENAI' | 'ANTHROPIC' | 'GEMINI' | null = null;
-      if (text.includes('GPT') || text.includes('OpenAI'))       model = 'OPENAI';
+      if (text.includes('GPT') || text.includes('OpenAI')) model = 'OPENAI';
       if (text.includes('Claude') || text.includes('Anthropic')) model = 'ANTHROPIC';
-      if (text.includes('Gemini') || text.includes('Google'))    model = 'GEMINI';
+      if (text.includes('Gemini') || text.includes('Google')) model = 'GEMINI';
       if (!model) {
         await safeSend(
           bot, chatId,
@@ -228,7 +287,8 @@ export const handlePostFlow = async (bot:TelegramBot,msg:TelegramBot.Message,): 
         bot, chatId,
         `📝 Tell me the idea or core message\\.\n\n_Keep it under 500 characters — I'll handle the rest\\._`,
         removeKeyboard(),);
-      break; }
+      break;
+    }
     case 'IDEA': {
       if (text.length > 500) {
         await safeSend(
@@ -239,29 +299,29 @@ export const handlePostFlow = async (bot:TelegramBot,msg:TelegramBot.Message,): 
         return;
       }
       await saveSession(chatId, { ...session, step: 'CONFIRM', idea: text });
-      await bot.sendChatAction(chatId, 'typing').catch(() => {});
+      await bot.sendChatAction(chatId, 'typing').catch(() => { });
       await safeSend(bot, chatId, `Generating your content\\.\\.\\. ⚙️\n\n_This takes about 5–10 seconds\\._`);
       try {
         const result = await generateContent({
-          idea:      text,
-          postType:  session.postType!,
+          idea: text,
+          postType: session.postType!,
           platforms: session.platforms!,
-          tone:      session.tone!.toLowerCase(),
-          language:  'en',
-          model:     session.model!,
-          userId:    session.userId!,
+          tone: session.tone!.toLowerCase(),
+          language: 'en',
+          model: session.model!,
+          userId: session.userId!,
         });
         await saveSession(chatId, {
           ...session,
-          step:       'CONFIRM',
-          idea:       text,
-          generated:  result.generated,
-          modelUsed:  result.modelUsed,
+          step: 'CONFIRM',
+          idea: text,
+          generated: result.generated,
+          modelUsed: result.modelUsed,
           tokensUsed: result.tokensUsed,
         });
         let preview = `✨ *Here's your content:*\n\n`;
         for (const [platform, data] of Object.entries(result.generated)) {
-          const emoji   = PLATFORM_EMOJI[platform] ?? '📝';
+          const emoji = PLATFORM_EMOJI[platform] ?? '📝';
           const display = Object.keys(PLATFORM_LABELS).find(
             (k) => PLATFORM_LABELS[k] === platform,
           ) ?? platform;
@@ -284,7 +344,7 @@ export const handlePostFlow = async (bot:TelegramBot,msg:TelegramBot.Message,): 
               [{ text: '❌ Cancel' }],
             ],
             one_time_keyboard: true,
-            resize_keyboard:   true,
+            resize_keyboard: true,
           },
         });
 
@@ -315,8 +375,8 @@ export const handlePostFlow = async (bot:TelegramBot,msg:TelegramBot.Message,): 
       if (text === '✏️ Edit Idea') {
         await saveSession(chatId, {
           ...session,
-          step:      'IDEA',
-          idea:      undefined,
+          step: 'IDEA',
+          idea: undefined,
           generated: undefined,
         });
         await safeSend(
@@ -342,19 +402,19 @@ export const handlePostFlow = async (bot:TelegramBot,msg:TelegramBot.Message,): 
         try {
           const post = await prisma.post.create({
             data: {
-              userId:     session.userId!,
-              idea:       session.idea!,
-              postType:   session.postType! as any,
-              tone:       session.tone!.toLowerCase(),
-              modelused:  session.modelUsed ?? session.model!,
-              aiModel:    session.model === 'OPENAI'
-                            ? 'OPENAI'
-                            : session.model === 'ANTHROPIC'
-                              ? 'ANTHROPIC'
-                              : 'GEMINI',
+              userId: session.userId!,
+              idea: session.idea!,
+              postType: session.postType! as any,
+              tone: session.tone!.toLowerCase(),
+              modelused: session.modelUsed ?? session.model!,
+              aiModel: session.model === 'OPENAI'
+                ? 'OPENAI'
+                : session.model === 'ANTHROPIC'
+                  ? 'ANTHROPIC'
+                  : 'GEMINI',
               tokensUsed: session.tokensUsed ?? 0,
-              stats:      'Pending',
-              bot:        'Telegram',
+              stats: 'Pending',
+              bot: 'Telegram',
             },
           });
 
@@ -363,31 +423,31 @@ export const handlePostFlow = async (bot:TelegramBot,msg:TelegramBot.Message,): 
           for (const [platform, data] of Object.entries(session.generated!)) {
             const pp = await prisma.platformPost.create({
               data: {
-                postId:    post.id,
-                platform:  platform as any,
-                content:   data.content,
+                postId: post.id,
+                platform: platform as any,
+                content: data.content,
                 hashtages: data.hashtags,
-                status:    'Queued',
+                status: 'Queued',
               },
             });
 
             const jobId = await enqueuePublishJob(
               {
                 platformPostId: pp.id,
-                postId:         post.id,
-                userId:         session.userId!,
+                postId: post.id,
+                userId: session.userId!,
                 platform,
-                content:        data.content,
-                hashtags:       data.hashtags,
-                publishAt:      null,
-                retryCount:     0,
+                content: data.content,
+                hashtags: data.hashtags,
+                publishAt: null,
+                retryCount: 0,
               },
               0,
             );
 
             await prisma.platformPost.update({
               where: { id: pp.id },
-              data:  { bulljobId: jobId },
+              data: { bulljobId: jobId },
             });
 
             const displayName =
@@ -425,7 +485,7 @@ export const handlePostFlow = async (bot:TelegramBot,msg:TelegramBot.Message,): 
             [{ text: '❌ Cancel' }],
           ],
           one_time_keyboard: true,
-          resize_keyboard:   true,
+          resize_keyboard: true,
         },
       });
       break;

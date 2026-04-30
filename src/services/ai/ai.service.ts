@@ -111,7 +111,7 @@ export const generateContent = async (params: GenerateParams): Promise<GenerateR
   }
   const generated: Record<string, PlatformContent> = {};
   for (const platform of params.platforms) {
-    const key = platform.toLowerCase();
+    const key = platform;
     const data = parsed[key];
     if (!data || !data.content) {
       console.warn(`AI did not generate content for platform: ${platform}`);

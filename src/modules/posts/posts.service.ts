@@ -14,7 +14,7 @@ async function createAndEnqueue(userId: string, data: PublishPostInput, publishA
     platform: string; platformPostId: string; content: string; charCount: number; hashtags: string[]; bullJobId: string; status: string;
   }[] = [];
   for (const platform of data.platforms) {
-    const key = platform.toLowerCase() as keyof typeof data.content;
+    const key = platform as keyof typeof data.content;
     const generated = data.content[key];
     if (!generated || !generated.content) {
       const pp = await prisma.platformPost.create({
