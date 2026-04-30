@@ -1,10 +1,10 @@
 import { PLATFORM_RULES } from './platform.prompts';
 
 interface PromptParams {
-  tone:      string;
-  language:  string;
+  tone: string;
+  language: string;
   platforms: string[];
-  postType:  string;
+  postType: string;
 }
 
 export const buildSystemPrompt = (params: PromptParams): string => {
@@ -47,7 +47,20 @@ Rules:
 - Count characters carefully before responding
 `.trim();
 };
-
-export const buildUserPrompt = (idea: string, postType: string): string => {
-  return `POST TYPE: ${postType}\nIDEA: ${idea}\n\nGenerate the content now.`;
+export const buildUserPrompt = (idea: string, postType: string, previousContent?: Record<string, { content: string; hashtags: string[] }>, refinementNote?: string): string => {
+  let prompt = `POST TYPE: ${postType}\nIDEA: ${idea}\n`;
+  if (previousContent && refinementNote) {
+    prompt += `\nREFINEMENT MODE — do NOT generate from scratch.\n`;
+    prompt += `The user already has content and wants changes.\n\n`;
+    prompt += `USER FEEDBACK: ${refinementNote}\n\n`;
+    prompt += `PREVIOUS CONTENT (improve this based on the feedback above):\n`;
+    for (const [platform, data] of Object.entries(previousContent)) {
+      const tags = data.hashtags?.length ? data.hashtags.join(', ') : 'none';
+      prompt += `[${platform}] ${data.content} | hashtags: ${tags}\n`;
+    }
+    prompt += `\nApply the user's feedback and return the improved version. Keep platforms and format the same.`;
+  } else {
+    prompt += `\nGenerate the content now.`;
+  }
+  return prompt;
 };

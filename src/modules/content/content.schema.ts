@@ -12,6 +12,11 @@ export const ContentSchema = z.object({
     tone: z.enum(TONES, { message: `Tone must be one of: ${TONES.join(', ')}` }),
     model: z.enum(AI_MODELS, { message: `Model must be one of: ${AI_MODELS.join(', ')}` }),
     language: z.string().min(2, 'Language must be at least 2 characters').max(50, 'Language cannot exceed 50 characters'),
+    previousContent: z.record(z.string(), z.object({
+        content: z.string(),
+        hashtags: z.array(z.string()).default([]),
+    })).optional(),
+    refinementNote: z.string().max(300, 'Refinement note cannot exceed 300 characters').optional(),
 });
 
 export type ContentInput = z.infer<typeof ContentSchema>;

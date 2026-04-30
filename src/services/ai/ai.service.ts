@@ -14,6 +14,8 @@ export interface GenerateParams {
   language: string;
   model: 'OPENAI' | 'ANTHROPIC' | 'GEMINI';
   userId: string;
+  previousContent?: Record<string, { content: string; hashtags: string[] }>;
+  refinementNote?: string;
 }
 export interface PlatformContent {
   content: string;
@@ -52,7 +54,7 @@ export const generateContent = async (params: GenerateParams): Promise<GenerateR
     platforms: params.platforms,
     postType: params.postType,
   });
-  const userPrompt = buildUserPrompt(params.idea, params.postType);
+  const userPrompt = buildUserPrompt(params.idea, params.postType, params.previousContent, params.refinementNote);
   let aiResponse: {
     raw: string; tokensIn: number; tokensOut: number; tokensUsed: number; model: string;
   };
