@@ -6,17 +6,17 @@ import { ApiError } from '../../utils/api-error';
 import type { PublishPostInput, SchedulePostInput, ListPostsQuery } from './posts.schema';
 import type { RequestMeta } from '../../utils/request-meta.util';
 const PLATFORM_POST_SELECT = {
-  id          : true,
-  platform    : true,
-  content     : true,
-  hashtages   : true,
-  status      : true,
-  attemps     : true,
-  publishAt   : true,
-  errorMessage: true,
-  bulljobId   : true,
-  createdAt   : true,
-  updatedAt   : true,
+  id           : true,
+  platform     : true,
+  content      : true,
+  hashtages    : true,
+  status       : true,
+  attemps      : true,
+  publishAt    : true,
+  errorMessage : true,
+  bulljobId    : true,
+  createdAt    : true,
+  updatedAt    : true,
 } as const;
 async function createAndEnqueue(
   userId   : string,
@@ -24,14 +24,16 @@ async function createAndEnqueue(
   publishAt: Date | null,
   meta     : RequestMeta,
 ) {
-  const delayMs = publishAt && publishAt > new Date()
-    ? publishAt.getTime() - Date.now()
-    : 0;
+  const delayMs =
+    publishAt && publishAt > new Date()
+      ? publishAt.getTime() - Date.now()
+      : 0;
+
   const post = await prisma.post.create({
     data: {
       userId,
       idea      : data.idea,
-      postType  : data.postType  as any,
+      postType  : data.postType as any,
       tone      : data.tone,
       modelused : data.modelUsed ?? data.model,
       aiModel   : data.model,
@@ -52,19 +54,24 @@ async function createAndEnqueue(
       createdAt : true,
     },
   });
+
   type PlatformResult = {
-    platform       : string;
-    platformPostId : string;
-    content        : string;
-    charCount      : number;
-    hashtags       : string[];
-    bullJobId      : string;
-    status         : string;
-    error?         : string;
+    platform      : string;
+    platformPostId: string;
+    content       : string;
+    charCount     : number;
+    hashtags      : string[];
+    bullJobId     : string;
+    status        : string;
+    error?        : string;
   };
+
   const platformResults: PlatformResult[] = [];
+
   for (const platform of data.platforms) {
+    // FIX: safely access optional content key
     const generated = data.content[platform as keyof typeof data.content];
+
     if (!generated?.content?.trim()) {
       const pp = await prisma.platformPost.create({
         data: {
@@ -89,6 +96,7 @@ async function createAndEnqueue(
       });
       continue;
     }
+
     const pp = await prisma.platformPost.create({
       data: {
         postId   : post.id,
@@ -99,12 +107,19 @@ async function createAndEnqueue(
         publishAt: publishAt ?? null,
       },
     });
+
     let bullJobId = '';
     try {
       bullJobId = await enqueuePublishJob(
         {
-          platformPostId: pp.id,postId:post.id,userId,platform,content:generated.content,hashtags:generated.hashtags,publishAt:publishAt ? publishAt.toISOString() : null,
-          retryCount:0,
+          platformPostId: pp.id,
+          postId        : post.id,
+          userId,
+          platform,
+          content       : generated.content,
+          hashtags      : generated.hashtags,
+          publishAt     : publishAt ? publishAt.toISOString() : null,
+          retryCount    : 0,
         },
         delayMs,
       );
@@ -113,7 +128,10 @@ async function createAndEnqueue(
         data : { bulljobId: bullJobId },
       });
     } catch (queueErr: any) {
-      console.error(`[Posts] Failed to enqueue job for ${platform} (postId=${post.id}):`, queueErr?.message);
+      console.error(
+        `[Posts] Failed to enqueue job for ${platform} (postId=${post.id}):`,
+        queueErr?.message,
+      );
     }
     platformResults.push({
       platform,
@@ -125,17 +143,18 @@ async function createAndEnqueue(
       status        : 'Queued',
     });
   }
-  const statuses   = platformResults.map((r) => r.status);
-  const anyQueued  = statuses.some((s) => s === 'Queued');
-  const allFailed  = statuses.every((s) => s === 'Failed');
+  const statuses  = platformResults.map((r) => r.status);
+  const allFailed = statuses.every((s) => s === 'Failed');
   let aggregateStats: string;
-  if (allFailed)       aggregateStats = 'Failed';
+  if (allFailed)        aggregateStats = 'Failed';
   else if (delayMs > 0) aggregateStats = 'Pending';
   else                  aggregateStats = 'Processing';
+
   await prisma.post.update({
     where: { id: post.id },
     data : { stats: aggregateStats as any },
   });
+
   await createAuditLog({
     userId,
     action    : 'POST_CREATED',
@@ -150,13 +169,14 @@ async function createAndEnqueue(
       publishAt: publishAt?.toISOString() ?? null,
     },
   });
+
   return {
-    post: { ...post, stats: aggregateStats },
+    post     : { ...post, stats: aggregateStats },
     platforms: platformResults,
-    summary: {
-      total  : platformResults.length,
-      queued : platformResults.filter((r) => r.status === 'Queued').length,
-      failed : platformResults.filter((r) => r.status === 'Failed').length,
+    summary  : {
+      total : platformResults.length,
+      queued: platformResults.filter((r) => r.status === 'Queued').length,
+      failed: platformResults.filter((r) => r.status === 'Failed').length,
     },
   };
 }
@@ -176,24 +196,23 @@ export async function schedulePost(
   return createAndEnqueue(userId, data, publishAt, meta);
 }
 export async function listPosts(userId: string, query: ListPostsQuery) {
-  const { page, limit, status, platform, date_from, date_to } = query;
-  const skip = (page - 1) * limit;
+  const page  = Number(query.page)  || 1;
+  const limit = Number(query.limit) || 10;
+  const skip  = (page - 1) * limit;
+  const { status, platform, date_from, date_to } = query;
+  const createdAtFilter: Prisma.DateTimeFilter = {};
+  if (date_from) createdAtFilter.gte = new Date(date_from);
+  if (date_to)   createdAtFilter.lte = new Date(date_to);
+
   const where: Prisma.PostWhereInput = {
     userId,
     deletedat: null,
+    ...(status                             && { stats: status as any }),
+    ...((date_from || date_to) && { createdAt: createdAtFilter }),
   };
-  if (status)    where.stats = status as any;
-  if (date_from || date_to) {
-    where.createdAt = {};
-    if (date_from) (where.createdAt as any).gte = new Date(date_from);
-    if (date_to)   (where.createdAt as any).lte = new Date(date_to);
-  }
   if (platform) {
     const pps = await prisma.platformPost.findMany({
-      where : {
-        platform: platform as any,
-        post    : { userId, deletedat: null },  
-      },
+      where   : { platform: platform as any, post: { userId, deletedat: null } },
       select  : { postId: true },
       distinct: ['postId'],
     });
@@ -209,9 +228,7 @@ export async function listPosts(userId: string, query: ListPostsQuery) {
       skip,
       take    : limit,
       orderBy : { createdAt: 'desc' },
-      include : {
-        platformPosts: { select: PLATFORM_POST_SELECT },
-      },
+      include : { platformPosts: { select: PLATFORM_POST_SELECT } },
     }),
   ]);
   return {
@@ -242,7 +259,7 @@ export async function retryFailedPlatforms(
   meta  : RequestMeta,
 ) {
   const post = await prisma.post.findFirst({
-    where  : { id: postId, userId, deletedat: null },   // scoped to user
+    where  : { id: postId, userId, deletedat: null },
     include: { platformPosts: true },
   });
   if (!post) throw ApiError.notFound('Post not found');
@@ -257,7 +274,13 @@ export async function retryFailedPlatforms(
       `Current statuses: ${post.platformPosts.map((p) => `${p.platform}=${p.status}`).join(', ')}`,
     );
   }
-  const retryResults: { platform: string; platformPostId: string; bullJobId: string }[] = [];
+
+  const retryResults: {
+    platform      : string;
+    platformPostId: string;
+    bullJobId     : string;
+  }[] = [];
+
   for (const pp of failedPlatforms) {
     await prisma.platformPost.update({
       where: { id: pp.id },
@@ -268,6 +291,7 @@ export async function retryFailedPlatforms(
         retryAfter   : null,
       },
     });
+
     let bullJobId = '';
     try {
       bullJobId = await enqueuePublishJob(
@@ -288,9 +312,16 @@ export async function retryFailedPlatforms(
         data : { bulljobId: bullJobId },
       });
     } catch (queueErr: any) {
-      console.error(`[Posts] Retry enqueue failed for ${pp.platform}:`, queueErr?.message);
+      console.error(
+        `[Posts] Retry enqueue failed for ${pp.platform}:`,
+        queueErr?.message,
+      );
     }
-    retryResults.push({ platform: pp.platform, platformPostId: pp.id, bullJobId });
+    retryResults.push({
+      platform      : pp.platform,
+      platformPostId: pp.id,
+      bullJobId,
+    });
   }
   await prisma.post.update({
     where: { id: postId },
@@ -316,7 +347,7 @@ export async function cancelScheduledPost(
   meta  : RequestMeta,
 ) {
   const post = await prisma.post.findFirst({
-    where  : { id: postId, userId, deletedat: null },   // scoped to user
+    where  : { id: postId, userId, deletedat: null },
     include: { platformPosts: true },
   });
   if (!post) throw ApiError.notFound('Post not found');
@@ -327,16 +358,19 @@ export async function cancelScheduledPost(
     throw ApiError.badRequest('Post is already cancelled');
   }
   const cancellationResults: {
-    platform : string;
-    prevStatus: string;
+    platform    : string;
+    prevStatus  : string;
     jobCancelled: boolean;
   }[] = [];
   for (const pp of post.platformPosts) {
     if (pp.status === 'Published') {
-      cancellationResults.push({ platform: pp.platform, prevStatus: pp.status, jobCancelled: false });
+      cancellationResults.push({
+        platform    : pp.platform,
+        prevStatus  : pp.status,
+        jobCancelled: false,
+      });
       continue;
     }
-
     let jobCancelled = false;
     if (pp.bulljobId) {
       jobCancelled = await cancelJob(pp.bulljobId);
@@ -345,7 +379,11 @@ export async function cancelScheduledPost(
       where: { id: pp.id },
       data : { status: 'Cancelled' },
     });
-    cancellationResults.push({ platform: pp.platform, prevStatus: pp.status, jobCancelled });
+    cancellationResults.push({
+      platform    : pp.platform,
+      prevStatus  : pp.status,
+      jobCancelled,
+    });
   }
   const anyPublished = post.platformPosts.some((pp) => pp.status === 'Published');
   await prisma.post.update({
@@ -363,8 +401,13 @@ export async function cancelScheduledPost(
     ipAddress : meta.ipAddress,
     userAgent : meta.userAgent,
     metadata  : {
-      cancelledPlatforms: cancellationResults.filter((r) => r.prevStatus !== 'Published').map((r) => r.platform),
-      alreadyPublished  : cancellationResults.filter((r) => r.prevStatus === 'Published').map((r) => r.platform),},
+      cancelledPlatforms: cancellationResults
+        .filter((r) => r.prevStatus !== 'Published')
+        .map((r) => r.platform),
+      alreadyPublished: cancellationResults
+        .filter((r) => r.prevStatus === 'Published')
+        .map((r) => r.platform),
+    },
   });
   return {
     message  : 'Post cancelled successfully',
