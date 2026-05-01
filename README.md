@@ -194,8 +194,8 @@ RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
 # Optional. If unset, emails are printed to stdout (dev mode).
 # Get a key at https://resend.com
 
-FROM_EMAIL=noreply@postly.app
-# Optional. Default: noreply@postly.app. Sender address for all outbound emails.
+FROM_EMAIL=onboarding@resend.dev
+# Optional. Default: onboarding@resend.dev Sender address for all outbound emails.
 
 # ─── Application ─────────────────────────────────────────────────────────────
 APP_URL=http://localhost:3000
