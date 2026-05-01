@@ -15,9 +15,9 @@
 
 ### 🌐 Live Base URL
 
-```
-https://postly-aicontent.up.railway.app
-```
+**[https://postly-aicontent.up.railway.app](https://postly-aicontent.up.railway.app)**
+
+**[📚 Postman API Documentation](https://documenter.getpostman.com/view/44217137/2sBXqKnfFC)**
 
 > The API is fully deployed, the Telegram bot is live with webhook active, and all endpoints are callable right now. Deployment will remain live for at least 7 days from submission.
 
