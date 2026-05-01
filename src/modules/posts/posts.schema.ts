@@ -1,47 +1,86 @@
 import { z } from 'zod';
-
-const PLATFORMS = ['Twitter', 'Linkedin', 'Instagram', 'Threads'] as const;
-const POST_TYPES = ['Announcement', 'Thread', 'Story', 'Promotional', 'Educational', 'Opinion'] as const;
-const TONES = ['professional', 'casual', 'witty', 'serious', 'humorous', 'authoritative', 'friendly'] as const;
-const AI_MODELS = ['OPENAI', 'ANTHROPIC', 'GEMINI'] as const;
-const JOB_STATUSES = ['Queued', 'InProgress', 'Published', 'Failed', 'Cancelled'] as const;
-const POST_STATUSES = ['Pending', 'Processing', 'Partial', 'Published', 'Failed', 'Cancelled'] as const;
+export const PLATFORMS     = ['Twitter', 'Linkedin', 'Instagram', 'Threads'] as const;
+export const POST_TYPES    = ['Announcement', 'Thread', 'Story', 'Promotional', 'Educational', 'Opinion'] as const;
+export const TONES         = ['professional', 'casual', 'witty', 'serious', 'humorous', 'authoritative', 'friendly'] as const;
+export const AI_MODELS     = ['OPENAI', 'ANTHROPIC', 'GEMINI'] as const;
+export const JOB_STATUSES  = ['Queued', 'InProgress', 'Published', 'Failed', 'Cancelled'] as const;
+export const POST_STATUSES = ['Pending', 'Processing', 'Partial', 'Published', 'Failed', 'Cancelled'] as const;
 const platformContentItem = z.object({
-  content: z.string().min(1, 'Content cannot be empty'),
-  charCount: z.number().int().optional(),
-  hashtags: z.array(z.string()).default([]),
+  content : z.string().min(1, 'Content cannot be empty').max(5_000, 'Content too long'),
+  charCount: z.number().int().nonnegative().optional(),
+  hashtags : z.array(z.string().max(100)).max(30).default([]),
 });
-const PLATFORM_KEYS = ['Twitter', 'Linkedin', 'Instagram', 'Threads'] as const;
-export const publishPostSchema = z.object({
-  idea: z.string().min(10, 'Idea must be at least 10 characters').max(500, 'Idea cannot exceed 500 characters'),
-  postType: z.enum(POST_TYPES, { message: `Post type must be one of: ${POST_TYPES.join(', ')}` }),
-  platforms: z.array(z.enum(PLATFORMS, { message: `Each platform must be one of: ${PLATFORMS.join(', ')}` })).min(1, 'At least one platform must be selected'),
-  tone: z.enum(TONES, { message: `Tone must be one of: ${TONES.join(', ')}` }),
-  model: z.enum(AI_MODELS, { message: `Model must be one of: ${AI_MODELS.join(', ')}` }),
-  language: z.string().min(2, 'Language must be at least 2 characters').max(50, 'Language cannot exceed 50 characters').default('en'),
-  content: z.record(
-    z.enum(PLATFORM_KEYS, { message: `Platform key must be one of: ${PLATFORM_KEYS.join(', ')}` }),
-    platformContentItem,
-  ).refine(
-    (obj) => Object.keys(obj).length > 0,
-    { message: 'At least one platform content entry is required' },
-  ),
-  modelUsed: z.string().optional(),
-  tokensUsed: z.number().int().optional(),
-});
+export const publishPostSchema = z
+  .object({
+    idea: z
+      .string()
+      .min(10,  'Idea must be at least 10 characters')
+      .max(500, 'Idea cannot exceed 500 characters'),
+
+    postType: z.enum(POST_TYPES, {
+      error: `postType must be one of: ${POST_TYPES.join(', ')}`,
+    }),
+
+    platforms: z.array(z.enum(PLATFORMS, { error: `Each platform must be one of: ${PLATFORMS.join(', ')}` }),).min(1, 'At least one platform must be selected').max(4, 'Cannot post to more than 4 platforms').refine((arr) => new Set(arr).size === arr.length,
+        { message: 'Duplicate platforms are not allowed' },
+      ),
+    tone: z.enum(TONES, {
+      error: `Tone must be one of: ${TONES.join(', ')}`,
+    }),
+    model: z.enum(AI_MODELS, {
+      error: `Model must be one of: ${AI_MODELS.join(', ')}`,
+    }),
+    language: z.string().min(2).max(50).default('en'),
+    content: z.record(z.enum(PLATFORMS), platformContentItem),
+    modelUsed: z.string().optional(),
+    tokensUsed: z.number().int().nonnegative().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const missing = data.platforms.filter(
+      (p) => !(p in data.content) || !data.content[p as keyof typeof data.content]?.content?.trim(),
+    );
+    if (missing.length > 0) {
+      ctx.addIssue({
+        code   : z.ZodIssueCode.custom,
+        path   : ['content'],
+        message: `Missing or empty content for platform(s): ${missing.join(', ')}. ` +
+                 `Call POST /api/content/generate first, then pass the result here.`,
+      });
+    }
+    const extra = Object.keys(data.content).filter(
+      (k) => !(data.platforms as string[]).includes(k),
+    );
+    if (extra.length > 0) {
+      ctx.addIssue({
+        code   : z.ZodIssueCode.custom,
+        path   : ['content'],
+        message: `Unused content key(s): ${extra.join(', ')}. These platforms are not in platforms[].`,
+        fatal  : false,
+      });
+    }
+  });
 export type PublishPostInput = z.infer<typeof publishPostSchema>;
-export const schedulePostSchema = publishPostSchema.extend({
-  publishAt: z.string().datetime({ message: 'publishAt must be a valid ISO datetime string' }).refine((val) => new Date(val) > new Date(), {
-    message: 'publishAt must be in the future',
-  }),
-});
+export const schedulePostSchema = publishPostSchema
+  .extend({
+    publishAt: z.string().datetime({ message: 'publishAt must be a valid ISO 8601 datetime string' }).refine((val) => new Date(val) > new Date(), {
+        message: 'publishAt must be in the future',}),}).superRefine((data, ctx) => {
+    const maxDate = new Date();
+    maxDate.setFullYear(maxDate.getFullYear() + 1);
+    if (new Date(data.publishAt) > maxDate) {
+      ctx.addIssue({
+        code   : z.ZodIssueCode.custom,
+        path   : ['publishAt'],
+        message: 'Cannot schedule a post more than 1 year in advance',
+      });
+    }
+  });
 export type SchedulePostInput = z.infer<typeof schedulePostSchema>;
 export const listPostsQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
-  status: z.enum(POST_STATUSES).optional(),
-  platform: z.enum(PLATFORMS).optional(),
+  page     : z.coerce.number().int().min(1).default(1),
+  limit    : z.coerce.number().int().min(1).max(100).default(10),
+  status   : z.enum(POST_STATUSES).optional(),
+  platform : z.enum(PLATFORMS).optional(),
   date_from: z.string().datetime().optional(),
-  date_to: z.string().datetime().optional(),
+  date_to  : z.string().datetime().optional(),
 });
 export type ListPostsQuery = z.infer<typeof listPostsQuerySchema>;
