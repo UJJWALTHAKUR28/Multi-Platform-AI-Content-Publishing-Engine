@@ -9,7 +9,16 @@ import user from './modules/user/user.routes';
 import content from './modules/content/content.routes';
 import postRoutes from './modules/posts/posts.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
-const app=express()
+
+const app = express()
+
+// Determine allowed origins
+const allowedOrigins = [
+  process.env.APP_URL || "http://localhost:3000",
+  "http://localhost:3000",
+  "http://localhost:3001",
+];
+
 app.use(express.json())
 app.use(helmet())
 app.use(cookieParser())
@@ -34,16 +43,17 @@ app.use(
 app.use(express.urlencoded({ extended: true }));
 app.set("trust proxy", 1);
 
-app.get('/',(req,res)=>{
-    res.send('Welcome to Postly Backend!')
+app.get('/', (req, res) => {
+  res.send('Welcome to Postly Backend!')
 })
-app.get('/health',(req,res)=>{
-    res.send('OK')
+app.get('/health', (req, res) => {
+  res.send('OK')
 })
 app.use("/api/auth", authRoutes);
-app.use("/api/user",user)
-app.use("/api/content",content)
+app.use("/api/user", user)
+app.use("/api/content", content)
 app.use("/api/posts", postRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use(errorHandler);
 export default app
+
