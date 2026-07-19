@@ -13,7 +13,24 @@ const app=express()
 app.use(express.json())
 app.use(helmet())
 app.use(cookieParser())
-app.use(cors({origin: process.env.APP_URL || "http://localhost:3000",credentials: true,}),);
+// Support comma-separated list of allowed origins in APP_URL
+// e.g. APP_URL=http://localhost:3000,https://your-app.vercel.app
+const ALLOWED_ORIGINS = (process.env.APP_URL || "http://localhost:3000")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow server-to-server requests (no origin header)
+      if (!origin) return callback(null, true);
+      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    },
+    credentials: true,
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 app.set("trust proxy", 1);
 
