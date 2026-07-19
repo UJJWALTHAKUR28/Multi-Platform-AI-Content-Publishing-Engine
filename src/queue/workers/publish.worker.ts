@@ -2,8 +2,16 @@ import { Worker, Job } from 'bullmq';
 import { redis } from '../../config/redis';
 import { PublishJobData, BACKOFF_DELAYS } from '../publish.queue';
 import { processPublishJob, handleJobFailure } from '../processors/publish.proccesor';
-export const startPublishWorker = (): Worker => {
-    const worker = new Worker<PublishJobData>('publish',async (job: Job<PublishJobData>) => {await processPublishJob(job);},
+
+export const startPublishWorker = (): Worker | null => {
+    if (!redis) {
+        console.log('[Queue] Redis not configured - worker not started');
+        return null;
+    }
+
+    const worker = new Worker<PublishJobData>('publish', async (job: Job<PublishJobData>) => {
+        await processPublishJob(job);
+    },
         {
             connection: redis,
             concurrency: 5,
@@ -13,16 +21,19 @@ export const startPublishWorker = (): Worker => {
                 },
             },
         });
+
     worker.on('active', (job: Job<PublishJobData>) => {
         console.log(
             `[Queue] Job started | ${job.data.platform} | postId: ${job.data.postId} | attempt: ${job.attemptsMade + 1}/3`
         );
     });
+
     worker.on('completed', (job: Job<PublishJobData>) => {
         console.log(
             `[Queue] Job completed | ${job.data.platform} | platformPostId: ${job.data.platformPostId}`
         );
     });
+
     worker.on('failed', async (job: Job<PublishJobData> | undefined, error: Error) => {
         if (!job) return;
 
@@ -37,17 +48,23 @@ export const startPublishWorker = (): Worker => {
             });
         }
     });
+
     worker.on('error', (error: Error) => {
         console.error('[Queue] Worker error:', error.message);
     });
+
     worker.on('stalled', (jobId: string) => {
         console.warn(`[Queue] Job stalled and will be retried | jobId: ${jobId}`);
     });
+
     console.log('[Queue] Publish worker started — listening for jobs');
     return worker;
 };
-export const gracefulShutdown = async (worker: Worker): Promise<void> => {
+
+export const gracefulShutdown = async (worker: Worker | null): Promise<void> => {
+    if (!worker) return;
     console.log('[Queue] Shutting down worker gracefully...');
     await worker.close(true);
     console.log('[Queue] Worker shut down');
 };
+
