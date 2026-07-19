@@ -9,11 +9,29 @@ import user from './modules/user/user.routes';
 import content from './modules/content/content.routes';
 import postRoutes from './modules/posts/posts.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
+
 const app=express()
+
+// Determine allowed origins
+const allowedOrigins = [
+  process.env.APP_URL || "http://localhost:3000",
+  "http://localhost:3000",
+  "http://localhost:3001",
+];
+
 app.use(express.json())
 app.use(helmet())
 app.use(cookieParser())
-app.use(cors({origin: process.env.APP_URL || "http://localhost:3000",credentials: true,}),);
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
 app.use(express.urlencoded({ extended: true }));
 app.set("trust proxy", 1);
 
@@ -30,3 +48,4 @@ app.use("/api/posts", postRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use(errorHandler);
 export default app
+
